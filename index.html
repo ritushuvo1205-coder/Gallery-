@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My Gallery</title>
+  <style>
+    body { margin:0; padding:20px; background:#0f1220; color:#fff;
+       font-family:sans-serif; text-align:center; }
+h2 { font-size:28px; margin:30px 0 20px; }
+#lock { margin-top:80px; }
+input[type=password] { background:#1c2038; color:#fff; border:2px solid #3a3f6b;
+       border-radius:12px; padding:14px; font-size:22px; text-align:center;
+       width:180px; outline:none; }
+input[type=password]:focus { border-color:#6c63ff; }
+button { background:#6c63ff; color:#fff; border:none; border-radius:12px;
+       padding:12px 22px; font-size:16px; margin:6px; }
+#del { background:#e5484d; }
+input[type=file] { color:#aab; margin:10px 0; }
+input[type=file]::file-selector-button { background:#6c63ff; color:#fff;
+       border:none; border-radius:10px; padding:10px 16px; margin-right:10px; }
+#grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:15px; }
+#grid img { width:100%; aspect-ratio:1; object-fit:cover; border-radius:10px; }
+#msg, #pinmsg { color:#ff8a8a; }
+  </style>
+</head>
+<body>
+  <div id="lock">
+    <h2>Enter PIN</h2>
+    <input id="pin" type="password" inputmode="numeric" maxlength="4">
+    <br><br>
+    <button onclick="checkPin()">Unlock</button>
+    <p id="msg"></p>
+  </div>
+
+  <div id="gallery" style="display:none;">
+    <h2>My Gallery v2</h2>
+    <input id="files" type="file" accept="image/*" multiple onchange="addPhotos()">
+<button id="del" style="display:none" onclick="deleteSelected()">Delete selected photo</button>
+<button id="view" style="display:none" onclick="viewSelected()">View full screen</button>    <div id="grid"></div>
+<p>
+  <input id="newpin" type="password" inputmode="numeric" maxlength="4" placeholder="New PIN">
+  <button onclick="changePin()">Change PIN</button>
+</p>
+<p id="pinmsg"></p>
+  </div>
+<div id="viewer" onclick="this.style.display='none'" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:black;">
+  <img id="big" style="width:100%; height:100%; object-fit:contain;">
+</div>
+  <script>
+   window.onerror = function(m, s, line) { alert(m + " (line " + line + ")"); };
+    var saved = localStorage.getItem("pin");
+    if (!saved) document.querySelector("h2").innerText = "Create a PIN";
+
+    function checkPin() {
+      var box = document.getElementById("pin");
+      var msg = document.getElementById("msg");
+      var entered = box.value;
+
+      if (!saved) {
+        if (entered.length === 4) {
+          localStorage.setItem("pin", entered);
+          saved = entered;
+          box.value = "";
+          msg.innerText = "PIN saved! Enter it to unlock.";
+          document.querySelector("h2").innerText = "Enter PIN";
+        } else {
+          msg.innerText = "Use 4 digits";
+        }
+      } else if (entered === saved) {
+        document.getElementById("lock").style.display = "none";
+        document.getElementById("gallery").style.display = "block";
+      } else {
+        msg.innerText = "Wrong PIN";
+      }
+    }
+      var db;
+var req = indexedDB.open("gallery", 1);
+req.onupgradeneeded = function(e) {
+  e.target.result.createObjectStore("photos", { autoIncrement: true });
+};
+req.onsuccess = function(e) {
+  db = e.target.result;
+  loadPhotos();
+};
+var selected = null;
+
+function showPhoto(blob, key) {
+  var img = document.createElement("img");
+  img.src = URL.createObjectURL(blob);
+  img.addEventListener("click", function() {
+    if (selected) selected.img.style.outline = "";
+    selected = { img: img, key: key };
+    img.style.outline = "4px solid red";
+    document.getElementById("del").style.display = "inline-block";
+    document.getElementById("view").style.display = "inline-block";
+  });
+  document.getElementById("grid").appendChild(img);
+}
+
+function deleteSelected() {
+  if (!selected) return;
+  db.transaction("photos", "readwrite").objectStore("photos").delete(selected.key);
+  selected.img.remove();
+  selected = null;
+  document.getElementById("del").style.display = "none";
+  document.getElementById("view").style.display = "none";
+}
+
+function viewSelected() {
+  if (!selected) return;
+  document.getElementById("big").src = selected.img.src;
+  document.getElementById("viewer").style.display = "block";
+}
+function loadPhotos() {
+  var store = db.transaction("photos").objectStore("photos");
+  store.openCursor().onsuccess = function(e) {
+    var cursor = e.target.result;
+    if (cursor) {
+      showPhoto(cursor.value, cursor.key);
+      cursor.continue();
+    }
+  };
+}
+
+function addPhotos() {
+  var input = document.getElementById("files");
+  var files = Array.from(input.files);
+  var store = db.transaction("photos", "readwrite").objectStore("photos");
+  files.forEach(function(file) {
+    store.add(file).onsuccess = function(e) {
+      showPhoto(file, e.target.result);
+    };
+  });
+  input.value = "";
+}
+ function changePin() {
+  var box = document.getElementById("newpin");
+  var msg = document.getElementById("pinmsg");
+  if (box.value.length === 4) {
+    localStorage.setItem("pin", box.value);
+    saved = box.value;
+    box.value = "";
+    msg.innerText = "PIN changed!";
+  } else {
+    msg.innerText = "Use 4 digits";
+  }
+                                }
+  </script>
+</body>
+</html>
